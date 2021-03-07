@@ -524,6 +524,7 @@ public class ARActivity extends AppCompatActivity {
     }
 
     private LocationMarker createLocationMarker(double latitude, double longitude, Node node) {
+        // memory leak.
         LocationMarker marker = new LocationMarker(latitude, longitude, node);
         marker.setHeight(0);
         return marker;
