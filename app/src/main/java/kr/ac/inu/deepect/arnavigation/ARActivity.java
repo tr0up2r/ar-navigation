@@ -67,7 +67,7 @@ import kr.ac.inu.deepect.arnavigation.utils.ARLocationPermissionHelper;
 
 public class ARActivity extends AppCompatActivity {
     private boolean installRequested;
-    private boolean hasFinishedLoading[] = {false, false};
+    private boolean[] hasFinishedLoading = {false, false};
 
     private RelativeLayout container;
 
