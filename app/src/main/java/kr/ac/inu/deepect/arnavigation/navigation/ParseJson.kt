@@ -4,6 +4,7 @@ package kr.ac.inu.deepect.arnavigation.navigation
 import android.util.Log
 import com.skt.Tmap.TMapPoint
 import com.skt.Tmap.TMapPolyLine
+import kr.ac.inu.deepect.arnavigation.ARActivity
 import kr.ac.inu.deepect.arnavigation.ARActivity.clearMiddleNodes
 import kr.ac.inu.deepect.arnavigation.ARActivity.setMiddleNodes
 import org.json.JSONObject
@@ -12,7 +13,7 @@ class ParseJson {
     companion object{
         var totalTime : Int? = null
 
-        fun parseJSON (root : JSONObject) : TMapPolyLine {
+        fun parseJSON(root: JSONObject) : TMapPolyLine {
             val polyLine = TMapPolyLine()
             //popupListItems.clear()
 
@@ -34,7 +35,7 @@ class ParseJson {
                     if(type.equals("Point")){
                         //Point인 경우
                         var points = arrayOfNulls<TMapPoint>(1)
-                        points[0] = TMapPoint(coord.getDouble(1),coord.getDouble(0))
+                        points[0] = TMapPoint(coord.getDouble(1), coord.getDouble(0))
                         polyLine.addLinePoint(points[0])
 
                         var name = props.getString("name")
@@ -73,7 +74,7 @@ class ParseJson {
                     //if (popupListItems.get(popupListItems.size()-1).mainText.startsWith(","))
                     //                    popupListItems.remove(popupListItems.size()-1);
                 }
-            } catch (ex : Exception){
+            } catch (ex: Exception){
                 Log.d("EXC:", "an error occur while parsing json / " + ex.toString());
             }
             return polyLine

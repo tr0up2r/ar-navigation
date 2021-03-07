@@ -67,30 +67,31 @@ import kr.ac.inu.deepect.arnavigation.utils.ARLocationPermissionHelper;
 
 public class ARActivity extends AppCompatActivity {
     private boolean installRequested;
-    private boolean hasFinishedLoading[] = { false, false };
+    private boolean hasFinishedLoading[] = {false, false};
 
     private RelativeLayout container;
 
-    private ArFragment fragment;
+    // private ArFragment fragment;
 
     private ArSceneView arSceneView;
 
     // Our ARCore-Location scene
     private LocationScene locationScene;
-    // Renderables for this example
-    private ModelRenderable arrowRenderable;
-    private ModelRenderable myArrowRenderable;
+
+    // 3D Renderable
     private ModelRenderable targetRenderable;
 
     private static final String TAG = "LocationActivity";
 
+
+    // kotlin으로 작성된 코드에서 값을 직접 받아오기 위해 static으로 지정.
     private static TMapPoint destination;
-    // private static int middleLength;
 
     public static void setDestination(@NotNull TMapPoint dest) {
         destination = dest;
     }
 
+    // 지표 하나의 위, 경도와 description을 class로 만들어서 이용.
     private static class LatLonDesc {
         private double latitude;
         private double longitude;
@@ -102,33 +103,23 @@ public class ARActivity extends AppCompatActivity {
             this.description = description;
         }
 
-        public void setLatitude(double latitude) {
-            this.latitude = latitude;
-        }
-
-        public void setLongitude(double longitude) {
-            this.longitude = longitude;
-        }
-
         public double getLatitude() {
             return latitude;
         }
-
         public double getLongitude() {
             return longitude;
         }
-
         public String getDescription() {
             return description;
         }
     }
 
     private static List<LatLonDesc> middleNodes = null;
-
     private static List<String> descriptions = null;
 
     private int descIndex = 0;
 
+    // 이전 화면에서 생성된 middle node들을 모두 제거.
     public static void clearMiddleNodes() {
         if (middleNodes != null) {
             middleNodes = null;
@@ -137,6 +128,7 @@ public class ARActivity extends AppCompatActivity {
     }
 
     public static void setMiddleNodes(@NotNull double lat, double lon, String desc) {
+        // 간혹 description이 공백인 경우가 있는데, 이럴 경우엔 middle node를 굳이 생성하지 않음.
         if (desc != "") {
             LatLonDesc node = new LatLonDesc(lat, lon, desc);
             middleNodes.add(node);
@@ -150,6 +142,7 @@ public class ARActivity extends AppCompatActivity {
         descriptions = new ArrayList<String>();
     }
 
+    // 휴대폰에 저장될 스크린샷 파일명 생성
     private String generateFilename() {
         String date =
                 new SimpleDateFormat("yyyyMMddHHmmss", java.util.Locale.getDefault()).format(new Date());
@@ -197,26 +190,14 @@ public class ARActivity extends AppCompatActivity {
                     toast.show();
                     return;
                 }
-////                Snackbar snackbar = Snackbar.make(findViewById(android.R.id.content),
-////                        "성공적으로 캡쳐되었습니다.", Snackbar.LENGTH_LONG);
-////                snackbar.setAction("사진 보기", v -> {
-////                    File photoFile = new File(filename);
-////
-////                    Uri photoURI = FileProvider.getUriForFile(ARActivity.this,
-////                            ARActivity.this.getPackageName() + ".ar.codelab.name.provider",
-////                            photoFile);
-////                    Intent intent = new Intent(Intent.ACTION_VIEW, photoURI);
-////                    intent.setDataAndType(photoURI, "image/*");
-////                    intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-////                    startActivity(intent);
-//                });
-//                snackbar.show();
 
                 File photoFile = new File(filename);
 
                 Uri photoURI = FileProvider.getUriForFile(ARActivity.this,
-                            ARActivity.this.getPackageName() + ".ar.codelab.name.provider",
-                            photoFile);
+                        ARActivity.this.getPackageName() + ".ar.codelab.name.provider",
+                        photoFile);
+
+                // 서버로 사진을 보내고, 출발지 재설정 결과를 받아오기 위한 소켓 프로그래밍.
                 ConnectServer connectServer = new ConnectServer(photoFile,
                         new ConnectServer.EventListener() {
                             public void onSocketResult(String result) {
@@ -224,7 +205,7 @@ public class ARActivity extends AppCompatActivity {
                                 builder.setTitle("안내")
                                         .setMessage(result + "을(를) 출발지로 다시 설정하시겠습니까?")
                                         .setNegativeButton("아니오", null)
-                                        .setPositiveButton("예", new DialogInterface.OnClickListener(){
+                                        .setPositiveButton("예", new DialogInterface.OnClickListener() {
                                             @Override
                                             public void onClick(DialogInterface dialog, int which) {
                                                 Intent intent = new Intent(ARActivity.this, MainActivity.class);
@@ -247,16 +228,6 @@ public class ARActivity extends AppCompatActivity {
                             }
                         });
                 connectServer.start();
-//                Intent intent = new Intent(Intent.ACTION_VIEW, photoURI);
-//                intent.setDataAndType(photoURI, "image/*");
-//                intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-//                startActivity(intent);
-
-//                if (photoFile.delete()) {
-//                    Log.d(TAG, "kmyLog, 삭제 성공");
-//                } else {
-//                    Log.d(TAG, "kmyLog, 삭제 실패");
-//                }
             } else {
                 Toast toast = Toast.makeText(ARActivity.this,
                         "Failed to copyPixels: " + copyResult, Toast.LENGTH_LONG);
@@ -273,17 +244,20 @@ public class ARActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.ar_main);
-        container = (RelativeLayout)findViewById(R.id.ar_container);
-//        fragment = (ArFragment)
-//                getSupportFragmentManager().findFragmentById(R.id.sceneform_fragment);
+        container = (RelativeLayout) findViewById(R.id.ar_container);
 
         Display display = getWindowManager().getDefaultDisplay();
         Point size = new Point();
         display.getSize(size);
         Log.d(TAG, "kmyLog, size : " + size);
 
+        // ARCore와 연동되어 AR scene을 렌더링하는 arSceneView.
         arSceneView = findViewById(R.id.ar_scene_view);
-        ViewRenderable roadsignLayoutRenderables[] = new ViewRenderable[middleNodes.size()-1];
+
+        // 지표를 렌더링하기 위해서는 renderable 객체들을 생성해주어야 함.
+        // renderable : ARCore의 node에 연결하여 3D 공간에 렌더링하기 위한 클래스.
+        // node는 원래 바닥을 인식해야 배치가 가능한데, 여기서는 위, 경도를 임의로 줘서 생성함.
+        ViewRenderable roadsignLayoutRenderables[] = new ViewRenderable[middleNodes.size() - 1];
         clearDescriptions();
         Toast.makeText(this, "거리가 멀어 보이지 않는 지표가 있을 수 있습니다.", Toast.LENGTH_LONG).show();
 
@@ -291,14 +265,14 @@ public class ARActivity extends AppCompatActivity {
             String desc = middleNodes.get(i).getDescription();
             desc = desc.replace(" 을 ", "를(을) ");
             descriptions.add(desc);
-            Log.d(TAG, "kmyLog, desc : " + i + ", " + desc);
+            // Log.d(TAG, "kmyLog, desc : " + i + ", " + desc);
         }
 
+        // AR 지표에 들어갈 text들을 textview로 모두 설정.
         TextView descView = findViewById(R.id.descView);
         TextView descIndexView = findViewById(R.id.descIndexView);
         TextView correctionView = findViewById(R.id.correctionView);
         TextView accuracyView = findViewById(R.id.accuracyView);
-        // TextView destinationView = findViewById(R.id.destinationView);
         correctionView.setVisibility(View.INVISIBLE);
 
         descIndexView.setText(String.valueOf(descIndex + 1));
@@ -306,20 +280,20 @@ public class ARActivity extends AppCompatActivity {
         descView.setTypeface(null, Typeface.BOLD);
         //destinationView.setVisibility(View.INVISIBLE);
 
+        // 지표 설명 넘기는 버튼 구현.
         Button btnNext = findViewById(R.id.btnNext);
         btnNext.setOnClickListener(new Button.OnClickListener() {
             public void onClick(View v) {
                 if (descIndex == descriptions.size() - 1) {
                     Toast.makeText(ARActivity.this, "마지막 지표입니다.", Toast.LENGTH_SHORT).show();
                     return;
-                }
-                else if (descIndex == descriptions.size()-2) {
+                } else if (descIndex == descriptions.size() - 2) {
                     descIndex++;
+                    // 마지막 지표에 다다르면 색 다르게 표시해서 보여줌.
                     descIndexView.setBackgroundResource(R.drawable.destination_layout_style);
                     descIndexView.setText("");
                     descView.setText(descriptions.get(descIndex));
-                }
-                else {
+                } else {
                     descIndex++;
                     descIndexView.setText(String.valueOf(descIndex + 1));
                     descView.setText(descriptions.get(descIndex));
@@ -333,14 +307,12 @@ public class ARActivity extends AppCompatActivity {
                 if (descIndex == 0) {
                     Toast.makeText(ARActivity.this, "첫번째 지표입니다.", Toast.LENGTH_SHORT).show();
                     return;
-                }
-                else if (descIndex == descriptions.size()-1) {
+                } else if (descIndex == descriptions.size() - 1) {
                     descIndex--;
                     descIndexView.setBackgroundResource(R.drawable.roadsign_layout_desc_style);
                     descIndexView.setText(String.valueOf(descIndex + 1));
                     descView.setText(descriptions.get(descIndex));
-                }
-                else {
+                } else {
                     descIndex--;
                     descIndexView.setText(String.valueOf(descIndex + 1));
                     descView.setText(descriptions.get(descIndex));
@@ -350,6 +322,8 @@ public class ARActivity extends AppCompatActivity {
 
         Button btnCapture = findViewById(R.id.btnCapture);
         btnCapture.setVisibility(View.INVISIBLE);
+
+        // capture 버튼 누르면 앞서 구현한 takePhoto 함수가 call 되어서 스크린샷을 찍음.
         btnCapture.setOnClickListener(view -> takePhoto());
 
         Button btnReturn = findViewById(R.id.btnReturn);
@@ -382,34 +356,26 @@ public class ARActivity extends AppCompatActivity {
             }
         });
 
-                // Build a renderable from a 2D View.
-        // sceneform의 모든 build() 메소드는 CompleableFuture를 반환한다
-//        CompletableFuture<ViewRenderable> exampleLayout = // "미래에 처리할 업무(Task)로서,  Task 결과가 완료되었을때 값을 리턴하거나, 다른 Task가 실행되도록 발화(trigger)시키는 Task."
+//         sceneform의 모든 build() 메소드는 CompleableFuture를 반환한다
+//         CompletableFuture<ViewRenderable> exampleLayout = // "미래에 처리할 업무(Task)로서,
+//         Task 결과가 완료되었을때 값을 리턴하거나, 다른 Task가 실행되도록 발화(trigger)시키는 Task."
 //                ViewRenderable.builder()
 //                        .setView(this, R.layout.roadsign_layout)
 //                        .build();
 
         // When you build a Renderable, Sceneform loads its resources in the background while returning
         // a CompletableFuture. Call thenAccept(), handle(), or check isDone() before calling get().
-        CompletableFuture<ViewRenderable> exampleFutures[] = new CompletableFuture[middleNodes.size()-1];
-        for (int i = 0; i < exampleFutures.length; i++) {
-            exampleFutures[i] = ViewRenderable.builder()
+        CompletableFuture<ViewRenderable> roadsignFutures[] = new CompletableFuture[middleNodes.size() - 1];
+        for (int i = 0; i < roadsignFutures.length; i++) {
+            roadsignFutures[i] = ViewRenderable.builder()
                     .setView(this, R.layout.roadsign_layout)
                     .build();
         }
-        CompletableFuture<ModelRenderable> arrowFuture = ModelRenderable.builder()
-                .setSource(this, R.raw.arrow)
-                .build();
-        CompletableFuture<ModelRenderable> myArrowFuture = ModelRenderable.builder()
-                .setSource(this, R.raw.myarrow)
-                .build();
         CompletableFuture<ModelRenderable> targetFuture = ModelRenderable.builder()
                 .setSource(this, R.raw.target)
                 .build();
 
         CompletableFuture.allOf(
-                arrowFuture,
-                myArrowFuture,
                 targetFuture)
                 .handle(
                         (notUsed, throwable) -> {
@@ -423,8 +389,6 @@ public class ARActivity extends AppCompatActivity {
                             }
 
                             try {
-                                arrowRenderable = arrowFuture.get();
-                                myArrowRenderable = myArrowFuture.get();
                                 targetRenderable = targetFuture.get();
                                 hasFinishedLoading[0] = true;
                             } catch (InterruptedException | ExecutionException ex) {
@@ -434,21 +398,17 @@ public class ARActivity extends AppCompatActivity {
                         });
 
         CompletableFuture.allOf(
-                exampleFutures)
+                roadsignFutures)
                 .handle(
                         (notUsed, throwable) -> {
-                            // When you build a Renderable, Sceneform loads its resources in the background while
-                            // returning a CompletableFuture. Call handle(), thenAccept(), or check isDone()
-                            // before calling get().
-
                             if (throwable != null) {
                                 DemoUtils.displayError(this, "Unable to load renderables", throwable);
                                 return null;
                             }
 
                             try {
-                                for (int i = 0; i < exampleFutures.length; i++) {
-                                    roadsignLayoutRenderables[i] = exampleFutures[i].get();
+                                for (int i = 0; i < roadsignFutures.length; i++) {
+                                    roadsignLayoutRenderables[i] = roadsignFutures[i].get();
                                 }
                                 hasFinishedLoading[1] = true;
                             } catch (InterruptedException | ExecutionException ex) {
@@ -456,7 +416,6 @@ public class ARActivity extends AppCompatActivity {
                             }
                             return null;
                         });
-
 
         // Set an update listener on the Scene that will hide the loading message once a Plane is
         // detected.
@@ -480,39 +439,8 @@ public class ARActivity extends AppCompatActivity {
                             locationScene.mLocationMarkers.add(camera);
                         }
                         LocationMarker prevLocationMarker = null;
-//
-//                        for (int i = 0; i < middleNodes.size(); i++) {
-//                            // if (gpsMan.getCurrentLocation().getLongitude())
-//                            LatLon point = middleNodes.get(i);
-//                            /*
-//                            Location location = lm.getLastKnownLocation(LocationManager.GPS_PROVIDER);
-//                            Log.i(TAG, "now Lat & Lon : " + location.getLatitude() + ", " + location.getLongitude() + ", Accuracy : " + location.getAccuracy());
-//                            Log.i(TAG, "kmyLog2 : " + (SystemClock.elapsedRealtimeNanos() - location.getElapsedRealtimeNanos()));
-//                            if (distFrom(location.getLatitude(), location.getLongitude(), point.getLatitude(), point.getLongitude()) > 100)
-//                                continue;
-//                            */
-//                            Node node = new Node();
-//                            LocationMarker locationMarker = createLocationMarker(
-//                                    point.getLatitude(), point.getLongitude(), node);
-//                            // ~m 이내의 마커만 표시.
-//                            locationMarker.setOnlyRenderWhenWithin(500);
-//                            // 이전 노드가 현재 노드의 방향을 가리키도록 함.
-//                            prevLocationMarker.setLookNode(node);
-//                            prevLocationMarker = locationMarker;
-//
-//                            // 타겟 마커는 현재 points의 가장 마지막 원소만 rendering 하도록.
-//                            /* node.setRenderable((i < middleNodes.size()) ?
-//                                    arrowRenderable : targetRenderable); */
-//                            node.setRenderable(arrowRenderable);
-//                            locationScene.mLocationMarkers.add(locationMarker);
-//                        }
-//                        Node node = new Node();
-//                        LocationMarker locationMarker = createLocationMarker(destination.getLatitude(), destination.getLongitude(), node);
-//                        prevLocationMarker.setLookNode(node);
-//                        prevLocationMarker = locationMarker;
-//                        node.setRenderable(targetRenderable);
-//                        LocationScene.mLocationMarkers.add(locationMarker);
-                        for (int i = 0; i < middleNodes.size()-1; i++) {
+
+                        for (int i = 0; i < middleNodes.size() - 1; i++) {
                             final int finalI = i;
                             LatLonDesc point = middleNodes.get(i);
 
@@ -547,8 +475,7 @@ public class ARActivity extends AppCompatActivity {
                                     if (node.getDistance() > 100) {
                                         roadsignLayout.setBackgroundResource(R.drawable.roadsign_layout_style_half);
                                         roadsignTextView.setText(indexString);
-                                    }
-                                    else {
+                                    } else {
                                         roadsignLayout.setBackgroundResource(R.drawable.roadsign_layout_style);
                                         if (angle >= 30)
                                             arrow = "→";
@@ -556,30 +483,13 @@ public class ARActivity extends AppCompatActivity {
                                             arrow = "←";
                                         else
                                             arrow = "↑";
-                                        roadsignTextView.setText(indexString + '\n' +  arrow);
+                                        roadsignTextView.setText(indexString + '\n' + arrow);
                                     }
                                     if (DeviceLocation.getIsAccuracyLow()) {
                                         accuracyView.setBackgroundResource(R.drawable.accuracy_style_red);
-                                    }
-                                    else {
+                                    } else {
                                         accuracyView.setBackgroundResource(R.drawable.accuracy_style_green);
                                     }
-//                                    if (angle >= 30 && angle < 60)
-//                                        arrow = "↗";
-//                                    else if (angle <= -30 && angle > -60)
-//                                        arrow = "↖";
-//                                    else if (angle >= 60 && angle < 120)
-//                                        arrow = "→";
-//                                    else if (angle <= -60 && angle > -120)
-//                                        arrow = "←";
-//                                    else if (angle < 30 && angle > -30)
-//                                        arrow = "↑";
-//                                    else if (angle >= 120 && angle <= 180)
-//                                        arrow = "↘";
-//                                    else if (angle <= -120 && angle >= -180)
-//                                        arrow = "↙";
-//                                    else
-//                                        arrow = "";
                                 }
                             });
                             // Adding the marker
@@ -611,21 +521,6 @@ public class ARActivity extends AppCompatActivity {
 
         // Lastly request CAMERA & fine location permission which is required by ARCore-Location.
         ARLocationPermissionHelper.requestPermission(this);
-
-//        btnCapture.setOnClickListener(new Button.OnClickListener() {
-//            public void onClick(View v) {
-//                arSceneView.buildDrawingCache();
-//                Bitmap captureView = arSceneView.getDrawingCache();
-//                FileOutputStream fos;
-//                try {
-//                    fos = new FileOutputStream(Environment.getExternalStorageDirectory().toString()+"/capture.jpeg");
-//                    captureView.compress(Bitmap.CompressFormat.JPEG, 100, fos);
-//                } catch (FileNotFoundException e) {
-//                    e.printStackTrace();
-//                }
-//                Toast.makeText(getApplicationContext(), "캡쳐 후 서버로 전송되었습니다.", Toast.LENGTH_LONG).show();
-//            }
-//        });
     }
 
     private LocationMarker createLocationMarker(double latitude, double longitude, Node node) {
@@ -751,49 +646,4 @@ public class ARActivity extends AppCompatActivity {
             getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         }
     }
-
-
-
-//    private void blink() {
-//        final Handler handler = new Handler();
-//        new Thread(new Runnable() {
-//            @Override
-//            public void run() {
-//                int timeToBlink = 800;
-//                try {Thread.sleep(timeToBlink);}
-//                catch (Exception e) {}
-//                    handler.post(new Runnable() {
-//                        @Override
-//                        public void run() {
-//                            TextView correctionView = (TextView) findViewById(R.id.correctionView);
-//                            if (!doesBlink) {
-//                                if (correctionView.getVisibility() == View.VISIBLE)
-//                                    correctionView.setVisibility(View.INVISIBLE);
-//                                else
-//                                    correctionView.setVisibility(View.VISIBLE);
-//                                blink();
-//                            }
-//                            else {
-//                                correctionView.setVisibility(View.INVISIBLE);
-//                            }
-//                        }
-//                    });
-//            }
-//        }).start();
-//    }
-
-};
-
-//    public static double distFrom(double nowLat, double nowLon, double destLat, double destLon) {
-//        double earthRadius = 6371000; //meters
-//        double dLat = Math.toRadians(destLat-nowLat);
-//        double dLng = Math.toRadians(destLon-nowLon);
-//        double a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-//                Math.cos(Math.toRadians(nowLat)) * Math.cos(Math.toRadians(destLat)) *
-//                        Math.sin(dLng/2) * Math.sin(dLng/2);
-//        double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-//        double dist = (double) (earthRadius * c);
-//
-//        Log.i(TAG, "kmyLog, Distance = " + String.valueOf(dist));
-//        return dist;
-//    }
+}
